@@ -5,7 +5,7 @@ import inet.node.ethernet.Eth1G;
 import inet.node.tsn.TsnDevice;
 import inet.node.tsn.TsnSwitch;
 
-network ring_TSN_Network extends TsnNetworkBase{
+network TSN_Network extends TsnNetworkBase{
     @display("bgb=1000,1000");
     submodules:
         Switch_1: TsnSwitch {}
