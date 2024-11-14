@@ -1,4 +1,5 @@
-from shared import *
+from .shared import MAX_PRIORITY,RATE
+import networkx as nx
 
 class Flow():
     def __init__(self, data_row):
