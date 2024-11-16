@@ -4,8 +4,8 @@ from flow import Flow
 
 
 def main():
-    net = Network("./test_cases/small-streams.v2.csv",
-                  "./test_cases/small-topology.v2.csv")
+    net = Network("../simulation_files/little/streams.csv",
+                  "../simulation_files/little/topology.csv")
 
     flows = []
     for stream in net.streams.iterrows():
@@ -19,6 +19,10 @@ def main():
     for flow in flows:
         flow.get_total_delay()
         print(flow)
+
+    # for flow in flows:
+    #     flow.new_get_total_delay()
+    #     print(flow)
 
 if __name__ == "__main__":
     main()

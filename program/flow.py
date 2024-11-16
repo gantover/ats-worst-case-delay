@@ -70,6 +70,42 @@ class Flow():
                 max_delay = delay
         
         return max_delay
+    def new_hop_delay(self, plink, nlink):
+        bH = 0
+        rH = 0
+        plink_f = plink["data"]["flows"]
+        nlink_f = nlink["data"]["flows"]
+        for priority in range(self.priority+1, MAX_PRIORITY+1):
+            for flow in nlink_f.get(priority, []):
+                bH += flow.b
+                rH += flow.r
+
+        lL = 0
+        for priority in range(0, self.priority):
+            for flow in nlink_f.get(priority, []):
+                lL = max(lL, flow.l)
+        
+        max_delay = 0
+        # sharing the same shaped queue
+        I_flows = [ f for f in plink_f[self.priority] if (f in nlink_f[self.priority]) ]
+        for j in I_flows:
+            bCj = 0
+            for flow_not_j in [flow for flow in I_flows if flow != j]:
+                bCj += flow_not_j.b
+            lj = j.l
+            delay = (bH + bCj + lL) / (RATE - rH) + lj / RATE
+            max_delay = max(delay, max_delay)
+
+        return max_delay
+
+            
+    def new_get_total_delay(self):
+        total = 0
+        total += self.new_hop_delay(self.links[0], self.links[0])
+        for i in range(len(self.links)-1):
+            total += self.new_hop_delay(self.links[i], self.links[i+1])
+        self.total_delay = total
+
 
     def get_total_delay(self):
         total = 0
