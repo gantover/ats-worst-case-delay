@@ -11,9 +11,9 @@ class Flow():
         self.deadline = data_row["Deadline"]
         self.name = data_row["StreamName"]
         self.l = data_row["Size"] # packet length
-        self.total_delay = None
+        self.total_delay = 0 
     
-    def find_path(self, G: nx.MultiGraph):
+    def find_path(self, G: nx.Graph):
         # first we find the shortest path from the source to the destination of the stream 
         path = nx.shortest_path(G, self.src, self.dest) 
         self.path = path
@@ -21,8 +21,15 @@ class Flow():
         edges = graph.edges()
         self.links = []
         for edge in edges:
-            link = G.edges.get([edge[0], edge[1], 0])
-            self.links.append({"edges": [G.nodes[edge[0]], G.nodes[edge[1]]], "data": link})
+            link = G.edges.get([edge[0], edge[1]])
+            assert link != None
+            src_port = int(link["src_port"])
+            dest_port = int(link["dest_port"])
+            if link["src"] == edge[1] and link["dest"] == edge[0]:
+                temp = src_port
+                src_port = dest_port
+                dest_port = temp
+            self.links.append({"edges": [G.nodes[edge[0]], G.nodes[edge[1]]], "src_port": src_port, "dest_port": dest_port})
 
     def __repr__(self):
         # just to have a print for comparison with solution.csv file
@@ -32,84 +39,66 @@ class Flow():
     def fill_nodes(self):
         # takes each nodes and adds this flow to the array
         # of all flows going through
-        for link in self.links:
-            link_flows = link["data"]["flows"]
-            link_flows[self.priority] = [*link_flows.get(self.priority, []), self]
+        
+        # for the ES sending the message, since there is only one port
+        # there is only one egress and one ingress : 0
+        edge, _ = self.links[0]["edges"]
+        edge_sq = edge["egress"][0]["shaped_queues"]
+        edge_sq[self.priority] = edge_sq.get(self.priority, dict())
+        edge_sq[self.priority][0] = edge_sq[self.priority].get(0, [])
+        edge_sq[self.priority][0].append(self)
 
-    def hop_delay(self, link, next_link = None):
+        for i in range(1,len(self.links)):
+            # we take the links that surround our edge (ES or SW) of interest
+            link_prev = self.links[i-1]
+            link_next = self.links[i]
+            # we take the ports our flow will go through
+            egress_port = link_next["src_port"]
+            ingress_port = link_prev["dest_port"]
+            _, edge0 = link_prev["edges"]
+            edge1, _ = link_next["edges"]
+            assert edge0 == edge1
+            edge = edge0
+            edge_sq = edge["egress"][egress_port]["shaped_queues"]
+            edge_sq[self.priority] = edge_sq.get(self.priority, dict())
+            edge_sq[self.priority][ingress_port] = edge_sq[self.priority].get(ingress_port, [])
+            edge_sq[self.priority][ingress_port].append(self)
+
+    def hop_delay(self, edge, ingress, egress):
         bH = 0
         rH = 0
         for priority in range(self.priority+1, MAX_PRIORITY+1):
-            for flow in link["data"]["flows"].get(priority, []):
+            for flow in edge["egress"][egress]["ready_queues"].get(priority):
                 bH += flow.b
                 rH += flow.r
         lL = 0
         for priority in range(0, self.priority):
-            for flow in link["data"]["flows"].get(priority, []):
-                if flow.l > lL:
-                    lL = flow.l
+            for flow in edge["egress"][egress]["ready_queues"].get(priority): 
+                lL = max(flow.l, lL)
         
 
-        shaped_queue_flows = []
-        for flow in link["data"]["flows"][self.priority]:
-            if next_link:
-                if not (flow in next_link["data"]["flows"][self.priority]):
-                    # we have to have the same output port on the switch
-                    continue
-            shaped_queue_flows.append(flow)
-            
+        shaped_queue = edge["egress"][egress]["shaped_queues"][self.priority][ingress]
+
         max_delay = 0
-        for flow in shaped_queue_flows:
+        for flow in shaped_queue:
             bc = 0
-            for bc_flow in shaped_queue_flows:
+            for bc_flow in shaped_queue:
                 if bc_flow != flow:
                     bc += bc_flow.b
             lj = flow.l
             delay = (bH + bc + lL) / (RATE - rH) + lj / RATE
-            if delay > max_delay:
-                max_delay = delay
-        
-        return max_delay
-    def new_hop_delay(self, plink, nlink):
-        bH = 0
-        rH = 0
-        plink_f = plink["data"]["flows"]
-        nlink_f = nlink["data"]["flows"]
-        for priority in range(self.priority+1, MAX_PRIORITY+1):
-            for flow in nlink_f.get(priority, []):
-                bH += flow.b
-                rH += flow.r
-
-        lL = 0
-        for priority in range(0, self.priority):
-            for flow in nlink_f.get(priority, []):
-                lL = max(lL, flow.l)
-        
-        max_delay = 0
-        # sharing the same shaped queue
-        I_flows = [ f for f in plink_f[self.priority] if (f in nlink_f[self.priority]) ]
-        for j in I_flows:
-            bCj = 0
-            for flow_not_j in [flow for flow in I_flows if flow != j]:
-                bCj += flow_not_j.b
-            lj = j.l
-            delay = (bH + bCj + lL) / (RATE - rH) + lj / RATE
             max_delay = max(delay, max_delay)
 
         return max_delay
-
             
-    def new_get_total_delay(self):
-        total = 0
-        total += self.new_hop_delay(self.links[0], self.links[0])
-        for i in range(len(self.links)-1):
-            total += self.new_hop_delay(self.links[i], self.links[i+1])
-        self.total_delay = total
-
-
     def get_total_delay(self):
         total = 0
-        for i in range(len(self.links)-1):
-            total += self.hop_delay(self.links[i], self.links[i+1])
-        total += self.hop_delay(self.links[-1], None)
+        edge, _ = self.links[0]["edges"]
+        total += self.hop_delay(edge, 0, 0)
+        for i in range(1, len(self.links)):
+            ingress = self.links[i-1]["dest_port"]
+            egress = self.links[i]["src_port"]
+            _, edge = self.links[i-1]["edges"]
+            total += self.hop_delay(edge, ingress, egress)
+
         self.total_delay = total
