@@ -162,3 +162,4 @@ cython_debug/
 #.idea/
 simulation_files/*/out/**
 simulation_files/*/.cmdenv-log
+simulation_files/*/results
