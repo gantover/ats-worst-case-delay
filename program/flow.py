@@ -29,7 +29,7 @@ class Flow():
                 temp = src_port
                 src_port = dest_port
                 dest_port = temp
-            self.links.append({"edges": [G.nodes[edge[0]], G.nodes[edge[1]]], "src_port": src_port, "dest_port": dest_port})
+            self.links.append({"nodes": [G.nodes[edge[0]], G.nodes[edge[1]]], "src_port": src_port, "dest_port": dest_port})
 
     def __repr__(self):
         # just to have a print for comparison with solution.csv file
@@ -42,11 +42,11 @@ class Flow():
         
         # for the ES sending the message, since there is only one port
         # there is only one egress and one ingress : 0
-        edge, _ = self.links[0]["edges"]
-        edge_sq = edge["egress"][0]["shaped_queues"]
-        edge_sq[self.priority] = edge_sq.get(self.priority, dict())
-        edge_sq[self.priority][0] = edge_sq[self.priority].get(0, [])
-        edge_sq[self.priority][0].append(self)
+        node, _ = self.links[0]["nodes"]
+        node_sq = node["egress"][0]["shaped_queues"]
+        node_sq[self.priority] = node_sq.get(self.priority, dict())
+        node_sq[self.priority][0] = node_sq[self.priority].get(0, [])
+        node_sq[self.priority][0].append(self)
 
         for i in range(1,len(self.links)):
             # we take the links that surround our edge (ES or SW) of interest
@@ -55,29 +55,27 @@ class Flow():
             # we take the ports our flow will go through
             egress_port = link_next["src_port"]
             ingress_port = link_prev["dest_port"]
-            _, edge0 = link_prev["edges"]
-            edge1, _ = link_next["edges"]
-            assert edge0 == edge1
-            edge = edge0
-            edge_sq = edge["egress"][egress_port]["shaped_queues"]
-            edge_sq[self.priority] = edge_sq.get(self.priority, dict())
-            edge_sq[self.priority][ingress_port] = edge_sq[self.priority].get(ingress_port, [])
-            edge_sq[self.priority][ingress_port].append(self)
+            _, node0 = link_prev["nodes"]
+            node1, _ = link_next["nodes"]
+            assert node0 == node1
+            node = node0
+            node_sq = node["egress"][egress_port]["shaped_queues"]
+            node_sq[self.priority] = node_sq.get(self.priority, dict())
+            node_sq[self.priority][ingress_port] = node_sq[self.priority].get(ingress_port, [])
+            node_sq[self.priority][ingress_port].append(self)
 
-    def hop_delay(self, edge, ingress, egress):
-        bH = 0
-        rH = 0
+    def hop_delay(self, node, ingress, egress):
+        bH, rH, lL = 0, 0, 0
         for priority in range(self.priority+1, MAX_PRIORITY+1):
-            for flow in edge["egress"][egress]["ready_queues"].get(priority):
+            for flow in node["egress"][egress]["ready_queues"].get(priority):
                 bH += flow.b
                 rH += flow.r
-        lL = 0
         for priority in range(0, self.priority):
-            for flow in edge["egress"][egress]["ready_queues"].get(priority): 
+            for flow in node["egress"][egress]["ready_queues"].get(priority): 
                 lL = max(flow.l, lL)
         
 
-        shaped_queue = edge["egress"][egress]["shaped_queues"][self.priority][ingress]
+        shaped_queue = node["egress"][egress]["shaped_queues"][self.priority][ingress]
 
         max_delay = 0
         for flow in shaped_queue:
@@ -93,12 +91,12 @@ class Flow():
             
     def get_total_delay(self):
         total = 0
-        edge, _ = self.links[0]["edges"]
-        total += self.hop_delay(edge, 0, 0)
+        node, _ = self.links[0]["nodes"]
+        total += self.hop_delay(node, 0, 0)
         for i in range(1, len(self.links)):
             ingress = self.links[i-1]["dest_port"]
             egress = self.links[i]["src_port"]
-            _, edge = self.links[i-1]["edges"]
-            total += self.hop_delay(edge, ingress, egress)
+            _, node = self.links[i-1]["nodes"]
+            total += self.hop_delay(node, ingress, egress)
 
         self.total_delay = total
