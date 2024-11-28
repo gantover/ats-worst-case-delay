@@ -4,8 +4,8 @@ from flow import Flow
 
 
 def main():
-    net = Network("../test_cases/small-streams.v2.csv",
-                  "../test_cases/small-topology.v2.csv")
+    net = Network("../simulation_files/mesh_topology/streams.csv",
+                  "../simulation_files/mesh_topology/topology.csv")
 
     flows = []
     for stream in net.streams.iterrows():
