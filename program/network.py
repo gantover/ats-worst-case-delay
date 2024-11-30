@@ -53,9 +53,9 @@ class Network:
             self.G.nodes[name]['ports'] = end_system[1]['Ports']
             num_ports = int(end_system[1]['Ports'])
             assert (num_ports == 1)
-            self.G.nodes[name]['egress'] = {port : dict() for port in range(num_ports)}
+            self.G.nodes[name]['egress'] = {port : dict() for port in range(1, num_ports+1)}
 
-            for port in range(num_ports):
+            for port in range(1, num_ports+1):
                 shaped_queues = ShapedQueues()
                 self.G.nodes[name]['egress'][port]["shaped_queues"] = shaped_queues
                 self.G.nodes[name]['egress'][port]["ready_queues"] = ReadyQueues(shaped_queues) 
@@ -65,9 +65,9 @@ class Network:
             self.G.nodes[name]['ports'] = switch[1]['Ports']
             num_ports = int(switch[1]['Ports'])
             assert (num_ports > 1 and num_ports <= 8)
-            self.G.nodes[name]['egress'] = {port : dict() for port in range(num_ports)}
+            self.G.nodes[name]['egress'] = {port : dict() for port in range(1, num_ports+1)}
 
-            for port in range(num_ports):
+            for port in range(1, num_ports+1):
                 shaped_queues = ShapedQueues()
                 self.G.nodes[name]['egress'][port]["shaped_queues"] = shaped_queues
                 self.G.nodes[name]['egress'][port]["ready_queues"] = ReadyQueues(shaped_queues) 

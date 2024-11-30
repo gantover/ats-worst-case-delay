@@ -7,7 +7,7 @@ class Flow():
         self.src = data_row["SourceNode"]
         self.dest = data_row["DestinationNode"]
         self.b = data_row["Size"]
-        self.r = data_row["Size"] / data_row["Period"]
+        self.r = data_row["Size"] / (data_row["Period"] * 1e-6) # we want bytes per s, the period is given in 10^-6s
         self.deadline = data_row["Deadline"]
         self.name = data_row["StreamName"]
         self.l = data_row["Size"] # packet length
@@ -43,10 +43,10 @@ class Flow():
         # for the ES sending the message, since there is only one port
         # there is only one egress and one ingress : 0
         node, _ = self.links[0]["nodes"]
-        node_sq = node["egress"][0]["shaped_queues"]
+        node_sq = node["egress"][1]["shaped_queues"]
         node_sq[self.priority] = node_sq.get(self.priority, dict())
-        node_sq[self.priority][0] = node_sq[self.priority].get(0, [])
-        node_sq[self.priority][0].append(self)
+        node_sq[self.priority][1] = node_sq[self.priority].get(1, [])
+        node_sq[self.priority][1].append(self)
 
         for i in range(1,len(self.links)):
             # we take the links that surround our edge (ES or SW) of interest
@@ -92,7 +92,7 @@ class Flow():
     def get_total_delay(self):
         total = 0
         node, _ = self.links[0]["nodes"]
-        total += self.hop_delay(node, 0, 0)
+        total += self.hop_delay(node, 1, 1)
         for i in range(1, len(self.links)):
             ingress = self.links[i-1]["dest_port"]
             egress = self.links[i]["src_port"]
