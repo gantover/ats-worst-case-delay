@@ -7,7 +7,7 @@ class Flow():
         self.src = data_row["SourceNode"]
         self.dest = data_row["DestinationNode"]
         self.b = data_row["Size"]
-        self.r = data_row["Size"] / data_row["Period"]
+        self.r = data_row["Size"] / (data_row["Period"] * 1e-6) # we want bytes per s, the period is given in 10^-6s
         self.deadline = data_row["Deadline"]
         self.name = data_row["StreamName"]
         self.l = data_row["Size"] # packet length

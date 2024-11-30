@@ -18,7 +18,6 @@ arg_parser.add_argument(
     help="The path to the topology file",
 )
 
-
 def main():
     args = arg_parser.parse_args()
     net = Network(args.stream_file, args.topology_file)
@@ -32,10 +31,14 @@ def main():
     for flow in flows:
         flow.fill_nodes()
 
+    mean_delay = 0
     for flow in flows:
         flow.get_total_delay()
+        mean_delay += flow.total_delay
         print(flow)
 
+    mean_delay /= len(flows)
+    print(f"mean delay : {mean_delay}")
 
 if __name__ == "__main__":
     main()
